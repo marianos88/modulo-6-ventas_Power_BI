@@ -30,3 +30,29 @@ Las relaciones se configuraron con **cardinalidad de Uno a Varios (1:*)** y **di
     *   **Cardinalidad:** `1:*` (Una operación o factura cabecera puede contener múltiples registros o líneas de producto en la tabla de hechos).
 
 Con esta corrección, se eliminó la redundancia de datos, se resolvió la restricción que impedía vincular la tabla de clientes y se optimizó el comportamiento del motor de almacenamiento (VertiPaq) de Power BI para el cálculo de medidas DAX.
+
+
+#### Tipos de Datos Asignados y Justificación Técnica
+
+Para maximizar la eficiencia de compresión en memoria y evitar errores de cálculo en las medidas DAX, se definieron estrictamente los tipos de datos en Power Query bajo los siguientes criterios de negocio:
+
+##### 1. Identificadores y Claves (IDs) ➔ Tipo: Texto (`Text`) o Número Entero (`Whole Number`)
+*   **Columnas:** `codigo_cliente`, `codigo_operacion`, `codigo_producto`.
+*   **Justificación:** Se configuran como **Texto** (o Número Entero si son puramente numéricos secuenciales sin letras ni ceros a la izquierda) debido a que sobre estas columnas **nunca se realizarán operaciones matemáticas** (como sumas o promedios). Definirlos correctamente evita que el motor intente indexarlos como métricas continuas, acelerando los tiempos de respuesta en los joins de las relaciones.
+
+##### 2. Fechas ➔ Tipo: Fecha (`Date`)
+*   **Columnas:** `fecha_alta` (en `D_Clientes`) y `fecha_venta` (en `D_Transaccion`).
+*   **Justificación:** Se eliminó el componente de hora (evitando el tipo *Date/Time*) para reducir la cardinalidad de la columna, lo que optimiza drásticamente la compresión del modelo en Power BI. Además, el tipo **Date** permite que las columnas sean 100% compatibles con las funciones de Inteligencia de Tiempo en DAX (como `SAMEPERIODLASTYEAR` o `TOTALYTD`).
+
+##### 3. Valores Cuantitativos y Métricas ➔ Tipo: Número Entero (`Whole Number`)
+*   **Columnas:** `cantidad`.
+*   **Justificación:** Representa unidades físicas absolutas y enteras vendidas por transacción. Al no requerir posiciones decimales, el tipo **Número Entero** consume menos almacenamiento y optimiza los cálculos de agregación sumatorios.
+
+##### 4. Montos, Precios y Porcentajes ➔ Tipo: Número Decimal Fijo / Moneda (`Decimal / Fixed Decimal Number`)
+*   **Columnas:** `precio_unitario`, `total_venta`, `descuento(%)`.
+*   **Justificación:** Las variables monetarias exigen máxima precisión financiera para evitar errores de redondeo acumulados en reportes consolidados. Se utiliza **Número Decimal Fijo (Currency)** para los montos en dinero debido a que congela exactamente 4 dígitos decimales de manera interna, garantizando un rendimiento de cálculo superior al del decimal flotante tradicional. Los porcentajes se definen como **Número Decimal** estándar (formateados luego como `%` en la vista de reporte).
+
+##### 5. Atributos Categóricos ➔ Tipo: Texto (`Text`)
+*   **Columnas:** `nombre_apellido`, `email`, `ciudad`, `provincia`, `segmento`, `estado`, `canal_venta`, `moneda`, `descripcion`.
+*   **Justificación:** Columnas cualitativas destinadas exclusivamente a la segmentación, etiquetado y filtrado de reportes en los objetos visuales (matrices, gráficos de barras, segmentadores).
+
