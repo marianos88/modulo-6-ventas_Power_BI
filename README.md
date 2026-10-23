@@ -1,7 +1,7 @@
 # modulo-6-ventas_Power_BI
 Normalización de la estructura Ventas y limpieza de datos
 
-### 🛠️ Correcciones y Optimización del Modelo de Datos
+### Correcciones y Optimización del Modelo de Datos
 
 El modelo de datos inicial presentaba limitaciones de rendimiento y ambigüedades en el filtrado debido a una separación incompleta de las tablas tras el proceso de normalización. A continuación, se detalla el criterio completo de diseño aplicado para corregir la estructura hacia un **Modelo en Estrella (Star Schema)** óptimo.
 
