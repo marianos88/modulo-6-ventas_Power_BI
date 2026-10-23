@@ -56,3 +56,28 @@ Para maximizar la eficiencia de compresión en memoria y evitar errores de cálc
 *   **Columnas:** `nombre_apellido`, `email`, `ciudad`, `provincia`, `segmento`, `estado`, `canal_venta`, `moneda`, `descripcion`.
 *   **Justificación:** Columnas cualitativas destinadas exclusivamente a la segmentación, etiquetado y filtrado de reportes en los objetos visuales (matrices, gráficos de barras, segmentadores).
 
+
+#### Tratamiento de Valores Nulos y Duplicados (Calidad de Datos)
+
+Durante la fase de ETL en Power Query, se aplicaron reglas estrictas de limpieza de datos para corregir registros inconsistentes, asegurando la integridad referencial del modelo estrella sin alterar las métricas de negocio.
+
+##### 1. Tratamiento de Duplicados
+*   **En Tablas de Dimensiones (`D_Clientes` y `D_Transaccion`):** 
+    *   **Acción:** Eliminación total de registros duplicados basados en sus Claves Primarias (`codigo_cliente` y `codigo_operacion`).
+    *   **Justificación Técnica:** Las dimensiones actúan como tablas maestras de búsqueda. Mantener filas repetidas rompe la restricción de unicidad, lo que impedía a Power BI establecer la relación ideal de 1 a Varios ($1:\star$) y forzaba relaciones incorrectas de Muchos a Muchos. Su eliminación garantiza que cada entidad descriptiva sea única.
+*   **En Tabla de Hechos (`F_Ventas`):**
+    *   **Acción:** Se preservaron las filas que compartían el mismo `codigo_operacion`.
+    *   **Justificación Técnica:** Una misma factura u operación puede contener múltiples líneas de venta (distintos productos, cantidades o precios). Eliminar estos registros habría significado una pérdida crítica de ingresos reales y volumen en las métricas consolidadas.
+
+##### 2. Tratamiento de Valores Nulos (`null`) o Vacíos
+La estrategia se dividió entre **eliminación** (para claves estructurales) y **reemplazo por defecto** (para atributos descriptivos) según su impacto en el modelo:
+
+*   **Claves Primarias y Foráneas (`codigo_cliente`, `codigo_operacion`) ➔ Eliminación**
+    *   **Acción:** Se filtraron y eliminaron las filas donde las claves de unión eran nulas.
+    *   **Justificación Técnica:** Si una fila de la dimensión no tiene código, no puede enlazarse con los hechos. Si un hecho no tiene código, se rompe la integridad referencial dejando registros "huérfanos". Al ser campos críticos de indexación, la eliminación es la única vía para evitar errores de consistencia en el motor analítico.
+*   **Atributos Categóricos Descriptivos (ej. `email`, `telefono`, `segmento`) ➔ Reemplazo con Valor por Defecto**
+    *   **Acción:** Se reemplazaron los valores nulos por textos estandarizados como `"Sin Especificar"` o `"No Registrado"`.
+    *   **Justificación Técnica:** Borrar a un cliente completo solo porque no dejó su correo o teléfono destruiría el historial de sus compras en la tabla de hechos (subestimando las ventas totales). El reemplazo por un valor por defecto mantiene la fila activa, permitiendo reportar la métrica financiera y agrupar los datos faltantes bajo una categoría limpia en los gráficos, facilitando además auditorías internas de datos.
+*   **Métricas Cuantitativas (ej. `descuento(%)`) ➔ Reemplazo con Valor Numérico**
+    *   **Acción:** Se imputaron los valores nulos con el número `0`.
+    *   **Justificación Técnica:** Los campos numéricos con valores `null` bloquean o desvían los cálculos aritméticos y las agregaciones automáticas en DAX (como la función `SUM` o promedios). Reemplazar por `0` asegura la continuidad matemática de las medidas sin alterar el resultado real de la operación.
